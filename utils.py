@@ -104,7 +104,7 @@ def agg_group_members(list_of_group_ids, api_key, write_path=None, intermediate_
     return all_members
 
 
-def get_events(urlname, date_filter_str=None, api_key=api_key):
+def get_events(urlname, date_filter_str=None, api_key=api_key, verbose = False):
     ''' Takes a Meetup group urlname and returns a DataFrame of events. Optionally, filter by date.'''
     
     q = 'https://api.meetup.com/{}/events?'.format(urlname)
@@ -112,13 +112,37 @@ def get_events(urlname, date_filter_str=None, api_key=api_key):
     q += '&{}'.format(api_key)
     response = requests.get(q)
     if response.status_code == 410:
-        raise ValueError('Group not accessible.')
+        if verbose:
+            print('-- response.status_code: 410, ', urlname , ' group not accessible.')
+        events_df = pd.DataFrame.from_dict(
+            {
+                'group_urlname':urlname,
+                'id': [None],
+                'name': [None],
+                'status': ['group not accessible'],
+                'time': [None],
+                'yes_rsvp_count':[None],
+            }
+        )
+        events_df.time = pd.to_datetime(events_df.time, unit='ms')
     if len(response.json()) == 0:
-        raise ValueError('No event results.')
-    
-    events_df = pd.DataFrame.from_dict(response.json())
-    events_df.time = pd.to_datetime(events_df.time, unit='ms')
-    events_df['group_urlname'] = urlname
+        if verbose:
+            print('-- No event results for ', urlname)
+        events_df = pd.DataFrame.from_dict(
+            {
+                'group_urlname':urlname,
+                'id': [None],
+                'name': [None],
+                'status': ['no event results'],
+                'time': [None],
+                'yes_rsvp_count':[None]
+            }
+        )
+        events_df.time = pd.to_datetime(events_df.time, unit='ms')
+    else:
+        events_df = pd.DataFrame.from_dict(response.json())
+        events_df.time = pd.to_datetime(events_df.time, unit='ms')
+        events_df['group_urlname'] = urlname
     
     if date_filter_str:
         events_df = events_df.loc[events_df.time > pd.to_datetime(date_filter_str)]
